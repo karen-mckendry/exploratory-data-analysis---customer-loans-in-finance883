@@ -1,2 +1,4 @@
 # Files not to be pushed to GitHub
 credentials.yaml
+loan_payments.csv
+familiarise.ipynb

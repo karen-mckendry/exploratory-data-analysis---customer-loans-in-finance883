@@ -313,7 +313,7 @@ class Plotter:
     
     def qq_plot(self, col):
         """
-        Prints a scatter plot of actual column values (y) against theoretical values from normal distribution (x)
+        Prints a scatter plot of actual column values (y) against theoretical values from normal distribution (x).
 
         Parameters
         ----------

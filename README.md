@@ -45,7 +45,7 @@ A class to return information on a DataFrame, with methods:
 class Plotter:
 A class to produce visualisations, with the following methods:
     qq_plot(col): 
-        Prints a scatter plot of actual column values (y) against theoretical values from normal distribution (x)
+        Prints a scatter plot of actual column values (y) against theoretical values from normal distribution (x).
     log_transform(col):
         Plot of log of column values.
     box_cox_transform(col):

@@ -6,6 +6,7 @@ import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
+import numpy_financial as npf
 
 pd.set_option('display.max_columns', 50)
 pd.set_option('display.max_rows', 80)
@@ -154,8 +155,11 @@ class DataFrameInfo:
     list_unique_values():
         Lists unique values for each categorical column in the DataFrame.
 
-    def normal_test(self):
+    def normal_test():
         D'Agostino's K^2 Test to test for normal distribution.
+
+    def crosstab_table(col1, col2):
+        Creates two crosstab DataFrames of 2 categorical columns in a DataFrame, one with the first column adding to 100% and one with the second adding to 100%.
     """
 
     def __init__(self, df):
@@ -186,14 +190,14 @@ class DataFrameInfo:
         for col in num_cols:
             col_stats = {
                 'Column': col,
-                'Mean': self.df[col].mean(),
-                'Median': self.df[col].median(),
-                'Mode': self.df[col].mode(),
-                'Std Dev': self.df[col].std(),
-                'Var': self.df[col].var(),
-                'Max': self.df[col].max(), 
-                'Min': self.df[col].min(),
-
+                'Mean': self.df[col].mean().round(2),
+                'Median': self.df[col].median().round(2),
+                'Mode': self.df[col].mode().round(2),
+                'Std Dev': self.df[col].std().round(2),
+                'Var': self.df[col].var().round(2),
+                'Max': self.df[col].max().round(2), 
+                'Min': self.df[col].min().round(2),
+                'Skew': self.df[col].skew().round(2)
             }
             col_stats_df = pd.DataFrame(col_stats)
             stats_df = pd.concat([stats_df, col_stats_df])
@@ -255,6 +259,28 @@ class DataFrameInfo:
             stat, p = stats.normaltest(data, nan_policy='omit')
             print('\n',col,': Statistics=%.3f, p=%.3f' % (stat, p))
 
+    def crosstab_table(self, col1, col2):
+        """
+        For 2 categorical columns in a DataFrame, creates 2 DataFrames, the first containing percentages of col1 x col2 with col2 adding to 100% 
+        and the second containing percentages of col1 x col 2 with col1 adding to 100%.
+
+        Parameters
+        ----------
+        col1, col2 : columns to c
+
+        Returns
+        -------
+        None
+        """
+        print(f'Percentage of each {col2} falling in each category in {col1} (columns add to 100%, subject to rounding):')
+        x = round(pd.crosstab(self.df[col1], self.df[col2]).apply(lambda c: c/c.sum(), axis=0)*100,1)
+        display(x)
+        print(f'\nPercentage of each {col1} falling in each category in {col2} (rows add to 100%, subject to rounding):')
+        y = round(pd.crosstab(self.df[col1], self.df[col2]).apply(lambda c: c/c.sum(), axis=1)*100,1)
+        display(y)
+        return x, y
+
+
 
 class Plotter:
     """
@@ -266,6 +292,9 @@ class Plotter:
 
     Methods
     -------
+    col_hist(col):
+        Prints a simple histogram of a column.
+
     qq_plot(col): 
         Prints a scatter plot of actual column values (y) against theoretical values from normal distribution (x)
 
@@ -290,6 +319,17 @@ class Plotter:
     scatter_plot(col_1, col_2):
         Scatter plot of col_1 against col_2.
 
+    bar_chart(col, x_vals, y_vals):
+        Bar chart of categorical column with percentage of each value
+
+    pie_chart(col):
+        A pie chart with percentage labels.
+
+    bar_chart(col, x_vals, y_vals):
+        A bar chart for use with crosstab_table method of DataFrameInfo.
+
+    hist_kde(cols):
+        Histogram with KDE curve.
     """
     
     def __init__(self, df):
@@ -309,11 +349,10 @@ class Plotter:
         None
         """
         self.df[col].hist(bins=40)
-        print(self.df[col].skew())
     
     def qq_plot(self, col):
         """
-        Prints a scatter plot of actual column values (y) against theoretical values from normal distribution (x).
+        Prints a scatter plot of actual column values (y) against theoretical values from normal distribution (x)
 
         Parameters
         ----------
@@ -459,6 +498,65 @@ class Plotter:
         None
         """
         sns.scatterplot(x = self.df[col_1], y = self.df[col_2])
+
+    def pie_chart(self, col):
+        """
+        Pie chart of col.
+
+        Parameters
+        ----------
+        col : the column whose data are to be represented in a pie chart.
+
+        Returns
+        -------
+        None
+        """
+        labels = self.df[col].sort_values().unique()
+        sizes = self.df[col].value_counts()/len(self.df)
+        fig, ax = plt.subplots()
+        ax.pie(sizes, labels=labels, autopct='%1.1f%%')
+        plt.show()
+
+    def bar_chart(self, col, x_vals, y_vals):
+        """
+        Bar chart showing percentage of each category in the column. Intended for a row of the first DataFrame returned by the crosstab_table method of DataFrameInfo class.
+
+        Parameters
+        ----------
+        x_vals : the values in the categorical column.
+        y_vals : the  percentage of those values
+        
+        Returns
+        -------
+        None
+        """
+        sns.barplot(x = x_vals, y = y_vals)
+        if max(x_vals.str.len()) > 3:
+            plt.xticks(rotation=90)
+
+        plt.xlabel(col)
+        plt.ylabel('Percentage')
+        plt.title(f'Percentage of loans of each {col} charged off')
+        plt.show()
+    
+    def hist_kde(self, cols):
+        """
+        Histogram with KDE curve.
+
+        Parameters
+        ----------
+        cols : the columns whose data are to be plotted.
+
+        Returns
+        -------
+        None
+        """
+        sns.set(font_scale=0.7)
+        f = pd.melt(self.df, value_vars=cols)
+        g = sns.FacetGrid(f, col="variable",  col_wrap=3, sharex=False, sharey=False)
+
+        g = g.map(sns.histplot, "value", kde=True)
+
     
    
 class DataFrameTransform:
@@ -494,6 +592,12 @@ class DataFrameTransform:
 
     remove_outliers(outliers):
         Removes outliers identified in either calc_outliers_IQR or calc_z_scores.
+
+    future_position():
+        Adds columns containing the oustanding principal for the next 6 months for a loans DataFrame.
+
+    loss_by_month(start_month):
+        Calculates the projected loss month by month for the outstanding months of a charged off loan.
     """
     
     def __init__(self, df):
@@ -654,6 +758,80 @@ class DataFrameTransform:
         -------
         DataFrameTransform
         """    
-        self.df = self.df[~self.df.isin(outliers)].dropna(how='all')
+        self.df = self.df[~self.df.index.isin(outliers.index)]
         return self   
     
+    def future_position(self):
+        """
+        Adds columns containing the oustanding principal for the next 6 months for a loans DataFrame.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        """    
+        
+        # calculate remaining months to pay
+        self.df['remaining_months'] = 0
+        self.df.loc[~self.df['loan_status'].isin(['Fully Paid','Charged Off']), 'remaining_months'] = self.df['term_months'] - (self.df['total_payment'] / self.df['instalment']).apply(np.ceil).astype(int) 
+
+        self.df[['out_prncp_m1','out_prncp_m2','out_prncp_m3','out_prncp_m4','out_prncp_m5','out_prncp_m6']]= 0
+        
+        i = 0
+        # mask = future_df['remaining_months'] - i > 0 - tried to apply this,  but columns out_prncp_m1-6 all then became 0!
+        
+        # calculate oustanding Principal after next payment
+        next_prncp_pyt = npf.ppmt(self.df['int_rate']/100/12, 1, self.df['remaining_months'], self.df[f'out_prncp'])
+        self.df[f'out_prncp_m1'] = self.df['out_prncp'] + next_prncp_pyt
+
+        # calculate outstanding Principal after remaining months:
+        for i in range(2, 7):
+            next_prncp_pyt = npf.ppmt(self.df['int_rate']/100/12, 1, self.df['remaining_months'] - i + 1, self.df[f'out_prncp_m{i - 1}'])
+            self.df[f'out_prncp_m{i}'] = self.df[f'out_prncp_m{i - 1}'] + next_prncp_pyt
+
+        # fill NaNs with zeroes
+        self.df[['out_prncp_m1','out_prncp_m2','out_prncp_m3','out_prncp_m4','out_prncp_m5','out_prncp_m6']] = self.df[['out_prncp_m1','out_prncp_m2','out_prncp_m3','out_prncp_m4','out_prncp_m5','out_prncp_m6']].fillna(0)
+        
+        # remove negative oustanding amounts
+        cols_to_remove_negatives = ['out_prncp_m1','out_prncp_m2','out_prncp_m3','out_prncp_m4','out_prncp_m5','out_prncp_m6']
+        for i in range (1,7):
+            self.df[f'out_prncp_m{i}'] = self.df[f'out_prncp_m{i}'].apply(lambda x: max(0, x))
+        
+
+
+    def loss_by_month(self, start_month):
+        """
+        Calculates the projected loss month by month for the outstanding months of a charged off loan.
+
+        Parameters
+        ----------
+        start_month : Month to begin the projection.
+
+        Returns
+        -------
+        DataFrame of dates and instalment amounts up to outstanding amount.
+        """    
+
+        max_months = self.df['mths_unpaid'].max().astype(int)
+        end_month = start_month + pd.DateOffset(months=max_months-1)
+        
+        # generate dates
+        loss_period = pd.date_range(start = start_month, end = end_month, freq = 'MS')
+
+        date_df = pd.DataFrame(index = self.df.index, columns = loss_period.T) 
+
+        self.df['loss'] = round(self.df['mths_unpaid'] * self.df['instalment'],2)
+        self.df['mths_unpaid_copy'] = self.df['mths_unpaid'].copy()
+        
+        for col in date_df.columns:
+            date_df[col] = self.df['mths_unpaid_copy'].where((self.df['mths_unpaid_copy'] > 0) & (self.df['mths_unpaid_copy'] < 1)) * self.df['instalment']
+            date_df[col] = self.df['instalment'].where(self.df['mths_unpaid_copy'] >= 1)
+            self.df['mths_unpaid_copy'] -= 1
+
+        date_df = date_df.fillna(0)
+
+        return date_df
+
